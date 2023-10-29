@@ -16,6 +16,12 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@matches/": ["libs/matches/src"],
+      "@matches/*": ["libs/matches/src/*"],
+      "@shared": ["libs/shared/src"],
+      "@shared/*": ["libs/shared/src/*"]
+    }
   }
 }
