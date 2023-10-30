@@ -1,24 +1,15 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/fifa-tise/src",
+  "sourceRoot": "apps/fifa-tise-agent/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
-    "tsConfigPath": "apps/fifa-tise/tsconfig.app.json"
+    "tsConfigPath": "apps/fifa-tise-agent/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/fifa-tise",
+  "root": "apps/fifa-tise-agent",
   "projects": {
-    "fifa-tise": {
-      "type": "application",
-      "root": "apps/fifa-tise",
-      "entryFile": "main",
-      "sourceRoot": "apps/fifa-tise/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/fifa-tise/tsconfig.app.json"
-      }
-    },
     "fifa-tise-agent": {
       "type": "application",
       "root": "apps/fifa-tise-agent",
@@ -44,6 +35,15 @@
       "sourceRoot": "libs/shared/src",
       "compilerOptions": {
         "tsConfigPath": "libs/shared/tsconfig.lib.json"
+      }
+    },
+    "players": {
+      "type": "library",
+      "root": "libs/players",
+      "entryFile": "index",
+      "sourceRoot": "libs/players/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/players/tsconfig.lib.json"
       }
     }
   }

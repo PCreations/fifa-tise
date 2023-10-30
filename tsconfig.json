@@ -12,7 +12,8 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": false,
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
@@ -21,7 +22,9 @@
       "@matches/": ["libs/matches/src"],
       "@matches/*": ["libs/matches/src/*"],
       "@shared": ["libs/shared/src"],
-      "@shared/*": ["libs/shared/src/*"]
+      "@shared/*": ["libs/shared/src/*"],
+      "@players": ["libs/players/src"],
+      "@players/*": ["libs/players/src/*"]
     }
   }
 }

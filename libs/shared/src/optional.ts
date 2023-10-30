@@ -36,7 +36,7 @@ export class Optional<T> {
       if (this.isNull()) {
         return resolve(Optional.empty<U>());
       }
-      fn(this.value).then(resolve, reject);
+      fn(this.value as T).then(resolve, reject);
     });
   }
 

@@ -1,3 +1,9 @@
+import {
+  EndPeriodAction,
+  PlayerAction,
+  PlayerActionFactory,
+} from './player-action';
+
 export enum StarRating {
   HALF = 0.5,
   ONE = 1,
@@ -17,6 +23,13 @@ type Team = {
   stars: StarRating;
   score: number;
 };
+
+export enum GoalType {
+  MALADE = 'malade',
+  CAROTTE = 'carotte',
+  KETCHUP = 'ketchup',
+  NORMAL = 'normal',
+}
 
 export enum MatchState {
   STARTED = 'started',
@@ -55,5 +68,108 @@ export class MatchEntity {
 
   get id() {
     return this.props.id;
+  }
+
+  scoreGoal({
+    scoredBy,
+    goalType,
+  }: {
+    scoredBy: string;
+    goalType: GoalType;
+  }): PlayerAction[] {
+    if (this.props.home.player === scoredBy) {
+      this.props.home.score += 1;
+    } else if (this.props.away.player === scoredBy) {
+      this.props.away.score += 1;
+    } else {
+      throw new Error('Player not in this match');
+    }
+
+    const against =
+      this.props.home.player === scoredBy ? this.props.away : this.props.home;
+
+    return PlayerActionFactory.create({
+      scoredBy,
+      against: against.player,
+      goalType,
+      ratingDiff:
+        against.player === scoredBy
+          ? this.computeAwayRatingDiff()
+          : this.computeHomeRatingDiff(),
+    });
+  }
+
+  halfTime(): PlayerAction[] {
+    if (this.props.state !== MatchState.STARTED) {
+      throw new Error('Match is not started or already finished');
+    }
+    this.props.state = MatchState.HALFTIME;
+    return this.handleEndPeriod();
+  }
+
+  endMatch(): PlayerAction[] {
+    if (this.props.state !== MatchState.HALFTIME) {
+      throw new Error(
+        'Match was not in the second half or is already finished',
+      );
+    }
+    this.props.state = MatchState.FINISHED;
+    return this.handleEndPeriod();
+  }
+
+  private handleEndPeriod() {
+    if (this.props.home.score === this.props.away.score) {
+      return [
+        new EndPeriodAction(
+          this.props.home.player,
+          this.computeHomeRatingDiff(),
+        ),
+        new EndPeriodAction(
+          this.props.away.player,
+          this.computeAwayRatingDiff(),
+        ),
+      ];
+    }
+
+    return [];
+  }
+
+  private computeHomeRatingDiff() {
+    return this.computeRatingDiff(this.props.home.stars, this.props.away.stars);
+  }
+
+  private computeAwayRatingDiff() {
+    return this.computeRatingDiff(this.props.away.stars, this.props.home.stars);
+  }
+
+  private computeRatingDiff(
+    starsRatingA: StarRating,
+    starsRatingB: StarRating,
+  ) {
+    return Math.ceil(Math.abs(starsRatingA - starsRatingB));
+  }
+
+  takeSnapshot() {
+    return structuredClone(this.props);
+  }
+
+  static fromSnapshot(snapshot: {
+    id: string;
+    home: Omit<Team, 'stars'> & { stars: number };
+    away: Omit<Team, 'stars'> & { stars: number };
+    state: string;
+  }) {
+    return new MatchEntity({
+      id: snapshot.id,
+      home: {
+        ...snapshot.home,
+        stars: snapshot.home.stars as StarRating,
+      },
+      away: {
+        ...snapshot.away,
+        stars: snapshot.away.stars as StarRating,
+      },
+      state: snapshot.state as MatchState,
+    });
   }
 }
