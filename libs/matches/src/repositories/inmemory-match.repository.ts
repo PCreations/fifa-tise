@@ -1,6 +1,7 @@
 import { MatchEntity } from '@matches/domain/match.entity';
 import { MatchRepository } from '@matches/domain/match.repository';
 import { Optional } from '@shared/optional';
+import { writeFile } from 'fs/promises';
 
 export class InMemoryMatchRepository implements MatchRepository {
   private readonly matchesById: Map<string, MatchEntity> = new Map();
@@ -29,6 +30,10 @@ export class InMemoryMatchRepository implements MatchRepository {
 
   async save(match: MatchEntity): Promise<void> {
     this.matchesById.set(match.id, match);
+    await writeFile(
+      'matches.json',
+      JSON.stringify(Object.fromEntries(this.matchesById.entries())),
+    );
   }
 
   async findCurrentStartedGameBetweenPlayers(

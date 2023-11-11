@@ -134,3 +134,196 @@ describe('Feature: starting a match', () => {
     );
   });
 });
+
+const isBirthday = (birthday: Date, date: Date) => {
+  return (
+    date.getDate() === birthday.getDate() &&
+    date.getMonth() === birthday.getMonth()
+  );
+};
+
+class User {
+  constructor(private readonly props: { id: string; name: string }) {}
+
+  bookRoom({ bookingId, bookingDetails }) {
+    return {
+      id: bookingId,
+      price: bookingDetails.price,
+    };
+  }
+}
+
+class InMemoryBookingRepository {
+  bookings = new Map<string, any>();
+
+  async getById(id: string) {
+    return this.bookings.get(id);
+  }
+
+  async save(booking: any) {
+    this.bookings.set(booking.id, booking);
+  }
+}
+
+class InMemoryUserRepository {
+  users = new Map<string, any>();
+
+  constructor(users: Record<string, any>) {
+    Object.entries(users).forEach(([id, user]) => {
+      this.users.set(id, user);
+    });
+  }
+
+  async getById(id: string) {
+    return this.users.get(id);
+  }
+}
+
+const createBookRoom =
+  ({ userRepository, bookingRepository, dateProvider = () => new Date() }) =>
+  async ({ userId, bookingId, bookingDetails }) => {
+    const user = await userRepository.getById(userId);
+    const booking = user.bookRoom({ bookingId, bookingDetails });
+    return bookingRepository.save(booking);
+  };
+
+it('should book a room', async () => {
+  const bookingRepository = new InMemoryBookingRepository();
+  const userRepository = new InMemoryUserRepository({
+    bob: new User({ id: 'bob', name: 'Bob' }),
+  });
+  const bookRoom = createBookRoom({
+    userRepository,
+    bookingRepository,
+  });
+
+  await bookRoom({
+    userId: 'bob',
+    bookingId: 'booking-42',
+    bookingDetails: { price: 50 },
+  });
+
+  const savedBooking = await bookingRepository.getById('booking-42');
+  expect(savedBooking).toEqual({
+    id: 'booking-42',
+    price: 50,
+  });
+
+  /**
+   *
+   * class User {
+   *  constructor(private readonly props: { id: string; name: string }) * {}
+   *
+   *   bookRoom({ bookingId, bookingDetails }) {
+   *     return {
+   *       id: bookingId,
+   *       price: bookingDetails.price,
+   *     };
+   *   }
+   * }
+   *
+   * const createBookRoom =
+   *   ({ userRepository, bookingRepository }) =>
+   *   async ({ userId, bookingId, bookingDetails }) => {
+   *     const user = await userRepository.getById(userId);
+   *     const booking = user.bookRoom({ bookingId, bookingDetails });
+   *     return bookingRepository.save(booking);
+   *   };
+   */
+});
+
+it('should book a room without discount if it is not the user birthday', async () => {
+  const bookingRepository = new InMemoryBookingRepository();
+  const userRepository = new InMemoryUserRepository({
+    bob: new User({ id: 'bob', name: 'Bob' }),
+  });
+  const bookRoom = createBookRoom({
+    userRepository,
+    bookingRepository,
+  });
+
+  await bookRoom({
+    userId: 'bob',
+    bookingId: 'booking-42',
+    bookingDetails: { price: 50 },
+  });
+
+  const savedBooking = await bookingRepository.getById('booking-42');
+  expect(savedBooking).toEqual({
+    id: 'booking-42',
+    price: 50,
+  });
+
+  /**
+   *
+   * class User {
+   *  constructor(private readonly props: { id: string; name: string }) * {}
+   *
+   *   bookRoom({ bookingId, bookingDetails }) {
+   *     return {
+   *       id: bookingId,
+   *       price: bookingDetails.price,
+   *     };
+   *   }
+   * }
+   *
+   * const createBookRoom =
+   *   ({ userRepository, bookingRepository }) =>
+   *   async ({ userId, bookingId, bookingDetails }) => {
+   *     const user = await userRepository.getById(userId);
+   *     const booking = user.bookRoom({ bookingId, bookingDetails });
+   *     return bookingRepository.save(booking);
+   *   };
+   */
+});
+
+it("should apply a discount for a room booking that occurs on the customer's birthday", async () => {
+  const bookingRepository = new InMemoryBookingRepository();
+  const userRepository = new InMemoryUserRepository({
+    bob: new User({ id: 'bob', name: 'Bob' }),
+  });
+  const bookRoom = createBookRoom({
+    userRepository,
+    bookingRepository,
+  });
+
+  await bookRoom({
+    userId: 'bob',
+    bookingId: 'booking-42',
+    bookingDetails: { price: 50 },
+  });
+
+  const savedBooking = await bookingRepository.getById('booking-42');
+  expect(savedBooking).toEqual({
+    id: 'booking-42',
+    price: 50,
+  });
+});
+
+test('isBirthday', () => {
+  expect(isBirthday(new Date('2021-01-01'), new Date('2022-01-01'))).toBe(true);
+  /**
+   * const isBirthday = (birthday: Date, date: Date) => true;
+   */
+
+  expect(isBirthday(new Date('2021-01-01'), new Date('2022-01-02'))).toBe(
+    false,
+  );
+  /**
+   * const isBirthday = (birthday: Date, date: Date) => {
+   *   return date.getDate() === birthday.getDate();
+   * };
+   */
+
+  expect(isBirthday(new Date('2021-02-01'), new Date('2022-01-01'))).toBe(
+    false,
+  );
+  /**
+   * const isBirthday = (birthday: Date, date: Date) => {
+   *   return (
+   *     date.getDate() === birthday.getDate() &&
+   *     date.getMonth() === birthday.getMonth()
+   *   );
+   * };
+   */
+});

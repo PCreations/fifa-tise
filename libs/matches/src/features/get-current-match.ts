@@ -14,10 +14,10 @@ export class GetCurrentMatchOf {
       currentMatchQuery.playerId,
     );
 
-    if (match.isNull()) {
-      return 'No match found';
-    }
-
-    return match.get();
+    return match.getOrThrow(
+      new Error(
+        `No match found for player with uuid ${currentMatchQuery.playerId}`,
+      ),
+    );
   }
 }

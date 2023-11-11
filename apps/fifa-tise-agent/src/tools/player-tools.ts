@@ -6,36 +6,51 @@ import { RegisterNewPlayer } from '@players/features/register-new-player';
 import { DynamicStructuredTool } from 'langchain/tools';
 import { z } from 'zod';
 
+// TODO : DEBUG LES ENTITIES+
+
 export const whoAmITool = (me: { id: string; email: string; name: string }) =>
   new DynamicStructuredTool({
-    name: 'qui-suis-je',
+    name: 'who-is-the-current-player',
     description:
-      'Utilise cet outil pour savoir quel joueur je suis dès que tu a besoin de savoir mon nom, mon email ou mon id',
+      'You MUST use this tool to know the CURRENT_PLAYER_ID, CURRENT_PLAYER_EMAIL and CURRENT_PLAYER_NAME.',
     schema: z.object({}),
     async func() {
-      return `Je suis ${JSON.stringify(me)}`;
+      const result = `${JSON.stringify({
+        currentPlayer: {
+          CURRENT_PLAYER_ID: me.id,
+          CURRENT_PLAYER_EMAIL: me.email,
+          CURRENT_PLAYER_NAME: me.name,
+        },
+      })}`;
+      return result;
     },
   });
 
 export const registerPlayerTool = (registerPlayer: RegisterNewPlayer) =>
   new DynamicStructuredTool({
-    name: 'enregistrer-un-nouveau-joueur',
-    description: `Utilise cet outil pour enregistrer un nouveau joueur si jamais le système te retourne qu'il n'existe pas. L'input doit contenir l'id du joueur, son nom, et son adresse email. Ne demande à l'utilisateur que le nom, l'adresse email et l'id te seront fournis par le système.`,
+    name: 'save-a-player',
+    description: `You MUST use this tool to register a new player when you haven't found it through the "find-players-by-name-or-email" tool.
+    The inputs are :
+    PLAYER_UUID : the uuid of the player you want to register. If you don't have one, you MUST generate one with the "uuid-generator" tool.
+    PLAYER_NAME : the name of the player, if you don't have one, you MUST ask to the user to provide one.
+    PLAYER_EMAIL : the email of the player, DO NOT MAKE UP ANSWER, if you don't have one, you MUST ask to the user to provide one. This MUST be a valid email`,
     schema: z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string().email(),
+      PLAYER_UUID: z.string(),
+      PLAYER_NAME: z.string(),
+      PLAYER_EMAIL: z.string().email(),
     }),
     async func(input) {
       try {
         await registerPlayer.execute({
-          id: input.id,
-          name: input.name,
-          email: input.email,
+          id: input.PLAYER_UUID,
+          name: input.PLAYER_NAME,
+          email: input.PLAYER_EMAIL,
         });
-        return `Le joueur ${JSON.stringify(input)} a bien été enregistré`;
+        const result = JSON.stringify({ success: true });
+        return result;
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
@@ -44,42 +59,52 @@ export const createBuddiesGroupTool = (
   createBuddiesGroup: CreateBuddiesGroup,
 ) =>
   new DynamicStructuredTool({
-    name: 'creer-un-nouveau-groupe-de-potes',
-    description: `Utilise cet outil pour créer un nouveau goupe de potes. L'input doit contenir l'uuid du groupe de potes et les ids des joueurs qui font partie du groupe de potes`,
+    name: 'create-a-buddies-group',
+    description: `You MUST use this tool to create a new buddies group. The input is :
+    BUDDIES_GROUP_UUID : the uuid of the buddies group you want to create, you MUST generate one with the "uuid-generator" tool.
+    PLAYERS_UUID: the PLAYER_UUID of the players you want to add in this buddies group. You MUST have already seen those PLAYER_UUID before ! If you don't know what PLAYER_UUID to use, ask the user more information about how to retrieve it.`,
     schema: z.object({
-      id: z.string(),
-      players: z.array(z.string()).nonempty(),
+      BUDDIES_GROUP_UUID: z.string().uuid(),
+      PLAYERS_UUID: z.array(z.string().uuid()).nonempty(),
     }),
     async func(input) {
       try {
         await createBuddiesGroup.execute({
-          id: input.id,
-          players: input.players,
+          id: input.BUDDIES_GROUP_UUID,
+          players: input.PLAYERS_UUID,
         });
-        return `Le groupe de potes ${JSON.stringify(input)} a bien été créé`;
+        return JSON.stringify({ success: true });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
 
 export const findPlayersTool = (findPlayers: FindPlayers) =>
   new DynamicStructuredTool({
-    name: 'trouver-des-joueurs-par-nom-ou-email',
-    description: `Utilise cet outil pour trouver un ou plusieurs joueurs à chaque fois que tu en as besoin. Que ce soit pour le récupérer, ou pour vérifier qu'il existe par exemple. L'input est un tableau "nameOrEmail" contenant des noms ou des emails des joueurs que tu veux chercher.`,
+    name: 'find-players-by-name-or-email',
+    description: `You MUST use this tool when you don't already know the information relative to a player by it's name or it's email. You can use this tool to find multiple players at once. The input is:
+    NAME_OR_EMAIL: an array containing the names or emails of the players you want to find.`,
     schema: z.object({
-      nameOrEmail: z.array(z.string()).nonempty(),
+      NAME_OR_EMAIL: z.array(z.string()).nonempty(),
     }),
     async func(input) {
       try {
         const players = await findPlayers.execute({
-          nameOrEmail: input.nameOrEmail,
+          nameOrEmail: input.NAME_OR_EMAIL,
         });
-        return `Les joueurs suivants ont été trouvés: ${JSON.stringify(
-          players,
-        )}`;
+        const result = JSON.stringify({
+          players: players.map((p) => ({
+            PLAYER_UUID: p.id,
+            PLAYER_NAME: p.name,
+            PLAYER_EMAIL: p.email,
+          })),
+        });
+        return result;
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
@@ -88,21 +113,28 @@ export const getPlayerBuddiesGroupTool = (
   getPlayerBuddiesGroup: GetPlayerBuddiesGroups,
 ) =>
   new DynamicStructuredTool({
-    name: 'touver-les-groupes-de-potes-d-un-joueur',
-    description: `Utilise cet outil pour récupérer les groupes de potes d'un joueur. L'input est l'id du joueur.`,
+    name: 'find-player-buddies-groups',
+    description: `You MUST use this tool to find the buddies groups of a player. The input is :
+    PLAYER_UUID: the id of the player you want to find the buddies groups of. You MUST have already seen this PLAYER_UUID before ! If you don't know what PLAYER_UUID to use, ask the user more information about how to retrieve it.`,
     schema: z.object({
-      playerId: z.string(),
+      PLAYER_UUID: z.string().uuid(),
     }),
     async func(input) {
       try {
         const buddiesGroups = await getPlayerBuddiesGroup.execute(
-          input.playerId,
+          input.PLAYER_UUID,
         );
-        return `Les groupes de potes suivants ont été trouvés: ${JSON.stringify(
-          buddiesGroups,
-        )}`;
+        return JSON.stringify({
+          buddiesGroups: buddiesGroups.map((bg) => ({
+            BUDDIES_GROUP_UUID: bg.id,
+            BUDDIES_GROUP_PLAYERS: [...bg.players].map((p) => ({
+              PLAYER_UUID: p,
+            })),
+          })),
+        });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
@@ -111,23 +143,24 @@ export const addPlayersInBuddiesGroupTool = (
   addPlayersInBuddiesGroup: AddPlayersInBuddiesGroup,
 ) =>
   new DynamicStructuredTool({
-    name: 'ajoute-des-joueurs-dans-un-groupe-de-potes',
-    description: `Utilise cet outil pour ajouter des joueurs dans un groupe de potes. L'input est l'id du groupe de potes et les ids des joueurs à ajouter.`,
+    name: 'add-players-in-buddies-group',
+    description: `You MUST use this tool to add players in a buddies group. The input is :
+    BUDDIES_GROUP_UUID: The id of the buddies group you want to add player in. You MUST know this BUDDIES_GROUP_UUID or ask the user for it.
+    PLAYERS_UUID: The PLAYER_UUID of the players you want to add in this buddies group. You MUST have already seen those PLAYER_UUID before ! If you don't know what PLAYER_UUID to use, ask the user more information about how to retrieve it.`,
     schema: z.object({
-      buddiesGroupId: z.string(),
-      players: z.array(z.string()).nonempty(),
+      BUDDIES_GROUP_UUID: z.string().uuid(),
+      PLAYERS_UUID: z.array(z.string().uuid()).nonempty(),
     }),
     async func(input) {
       try {
         const result = await addPlayersInBuddiesGroup.execute({
-          buddiesGroupId: input.buddiesGroupId,
-          players: input.players,
+          buddiesGroupId: input.BUDDIES_GROUP_UUID,
+          players: input.PLAYERS_UUID,
         });
-        return `Les joueurs suivants ont été ajoutés dans le groupe de potes: ${JSON.stringify(
-          result,
-        )}`;
+        return JSON.stringify({ result });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });

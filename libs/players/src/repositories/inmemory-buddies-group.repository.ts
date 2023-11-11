@@ -2,6 +2,7 @@ import { Optional } from '@shared/optional';
 import { BuddiesGroupEntity } from '../domain/buddies-group.entity';
 import { BuddiesGroupRepository } from '../domain/buddies-group.repository';
 import { Injectable } from '@nestjs/common';
+import { writeFile } from 'fs/promises';
 
 @Injectable()
 export class InMemoryBuddiesGroupRepository implements BuddiesGroupRepository {
@@ -13,6 +14,17 @@ export class InMemoryBuddiesGroupRepository implements BuddiesGroupRepository {
 
   async save(buddiesGroup: BuddiesGroupEntity) {
     this.buddiesGroupsById.set(buddiesGroup.id, buddiesGroup);
+    await writeFile(
+      'buddies-groups.json',
+      JSON.stringify(
+        Object.fromEntries(
+          [...this.buddiesGroupsById.entries()].map(([id, buddiesGroup]) => [
+            id,
+            buddiesGroup.takeSnapshot(),
+          ]),
+        ),
+      ),
+    );
   }
 
   async findAllWherePlayerIsIn(

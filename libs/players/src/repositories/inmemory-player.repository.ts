@@ -1,6 +1,7 @@
 import { Optional } from '@shared/optional';
 import { PlayerEntity } from '../domain/player.entity';
 import { PlayerRepository } from '../domain/player.repository';
+import { writeFile } from 'fs/promises';
 
 export class InMemoryPlayerRepository implements PlayerRepository {
   readonly playersById = new Map<string, PlayerEntity>();
@@ -20,6 +21,14 @@ export class InMemoryPlayerRepository implements PlayerRepository {
     this.playersById.set(player.id, player);
     this.playersByEmail.set(player.email, player);
     this.playersByName.set(player.name, player);
+    await writeFile(
+      'players.json',
+      JSON.stringify({
+        playersById: Object.fromEntries(this.playersById.entries()),
+        playersByEmail: Object.fromEntries(this.playersByEmail.entries()),
+        playersByName: Object.fromEntries(this.playersByName.entries()),
+      }),
+    );
   }
 
   async findByNameOrEmail(nameOrEmail: string[]): Promise<PlayerEntity[]> {

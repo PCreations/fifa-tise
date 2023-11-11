@@ -92,10 +92,15 @@ export class MatchEntity {
       scoredBy,
       against: against.player,
       goalType,
-      ratingDiff:
-        against.player === scoredBy
-          ? this.computeAwayRatingDiff()
-          : this.computeHomeRatingDiff(),
+      ...(scoredBy === this.props.home.player
+        ? {
+            scoredByRatingDiff: this.computeHomeRatingDiff(),
+            againstRatingDiff: this.computeAwayRatingDiff(),
+          }
+        : {
+            scoredByRatingDiff: this.computeAwayRatingDiff(),
+            againstRatingDiff: this.computeHomeRatingDiff(),
+          }),
     });
   }
 
@@ -146,7 +151,7 @@ export class MatchEntity {
     starsRatingA: StarRating,
     starsRatingB: StarRating,
   ) {
-    return Math.ceil(Math.abs(starsRatingA - starsRatingB));
+    return Math.ceil(Math.max(0, starsRatingA - starsRatingB));
   }
 
   takeSnapshot() {

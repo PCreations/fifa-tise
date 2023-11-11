@@ -17,7 +17,7 @@ export class RegisterNewPlayer {
       registerCommand.email,
     );
     if (playerExists) {
-      throw new Error('Player already exists');
+      return;
     }
     const player = new PlayerEntity({
       id: registerCommand.id,

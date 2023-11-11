@@ -1,144 +1,188 @@
-import { GoalType } from '@matches/domain/match.entity';
+import { GoalType, MatchEntity } from '@matches/domain/match.entity';
 import { EndMatch } from '@matches/features/end-match';
 import { GetCurrentMatchOf } from '@matches/features/get-current-match';
 import { HalfTime } from '@matches/features/half-time';
 import { ScoreGoal } from '@matches/features/score-goal';
 import { StartMatch } from '@matches/features/start-match';
-import { BufferMemory } from 'langchain/memory';
 import { DynamicStructuredTool } from 'langchain/tools';
 import { z } from 'zod';
 
+const formatMatchSnapshotToAi = (
+  matchSnapshot: ReturnType<MatchEntity['takeSnapshot']>,
+) => {
+  return `
+    CURRENT_MATCH_UUID: ${matchSnapshot.id},
+    CURRENT_MATCH_HOME_TEAM_PLAYER_UUID: ${matchSnapshot.home.player},
+    CURRENT_MATCH_HOME_TEAM_NAME: ${matchSnapshot.home.name},
+    CURRENT_MATCH_HOME_TEAM_STARS: ${matchSnapshot.home.stars},
+    CURRENT_MATCH_AWAY_TEAM_PLAYER_UUID: ${matchSnapshot.away.player},
+    CURRENT_MATCH_AWAY_TEAM_NAME: ${matchSnapshot.away.name},
+    CURRENT_MATCH_AWAY_TEAM_STARS: ${matchSnapshot.away.stars},
+    CURRENT_MATCH_HOME_TEAM_SCORE: ${matchSnapshot.home.score},
+    CURRENT_MATCH_AWAY_TEAM_SCORE: ${matchSnapshot.away.score},
+    CURRENT_MATCH_STATE: ${matchSnapshot.state},
+  `;
+};
+
 export const getCurrentMatchOfTool = (getCurrentMatchOf: GetCurrentMatchOf) =>
   new DynamicStructuredTool({
-    name: 'recuperer-le-match-en-cours-d-un-joueur',
-    description: `Utilise cet outil pour récupérer mon match en cours dès que tu en as besoin. Soit parce que je te le demande explicitement, soit parce que tu as besoin de récupérer l'id de mon adversaire. L'input contient mon id.`,
+    name: 'get-current-match-of-a-player',
+    description: `You MUST use this tool when you need information about the current match of a player. You MUST use this tool when you need to retrieve these information :
+    CURRENT_MATCH_UUID : The match uuid
+    CURRENT_MATCH_HOME_TEAM_PLAYER_UUID : The home team player uuid 
+    CURRENT_MATCH_HOME_TEAM_NAME : The home team name
+    CURRENT_MATCH_HOME_TEAM_STARS : The home team stars
+    CURRENT_MATCH_AWAY_TEAM_PLAYER_UUID : The away team player uuid
+    CURRENT_MATCH_AWAY_TEAM_NAME : The away team name
+    CURRENT_MATCH_AWAY_TEAM_STARS : The away team stars
+    CURRENT_MATCH_HOME_TEAM_SCORE : The home team score
+    CURRENT_MATCH_AWAY_TEAM_SCORE : The away team score
+    CURRENT_MATCH_STATE : The match state
+
+    The input is :
+    PLAYER_UUID : the uuid of the player you want to retrieve the current match. If you don't have one, you MUST ask to the user to provide one.`,
     schema: z.object({
-      playerId: z.string().min(1),
+      PLAYER_UUID: z.string().min(1),
     }),
     async func(input) {
       try {
         const match = await getCurrentMatchOf.execute({
-          playerId: input.playerId,
+          playerId: input.PLAYER_UUID,
         });
-        return `Le match en cours est : ${JSON.stringify(match)}`;
+        const result = JSON.stringify({
+          currentMatch: formatMatchSnapshotToAi(match.takeSnapshot()),
+        });
+        return result;
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
 
-export const startMatchTool = (startMatch: StartMatch, memory: BufferMemory) =>
+export const startMatchTool = (startMatch: StartMatch) =>
   new DynamicStructuredTool({
-    name: 'demarrer-un-match',
-    description: `Utilise cet outil pour démarrer un nouveau match entre deux joueurs. L'input contient l'uuid du match que tu devras générer, l'id du joueur à domicile, le nom de l'équipe à domicile et le nombre d'étoiles de l'équipe à domicile, l'id du joueur à l'extérieur, le nom de l'équipe à l'extérieur et le nombre d'étoiles de l'équipe à l'extérieur.`,
+    name: 'start-a-new-match-between-players',
+    description: `You MUST use this tool when you need to start a new match between two players. The input is :
+    MATCH_UUID : The UUID of the match that you MUST generate with the "uuid-generator" tool.
+    HOME_TEAM.PLAYER_UUID : The UUID of the player that will play at home. You MUST have already seen this PLAYER_UUID before ! If you don't know what PLAYER_UUID to use, ask the user more information about how to retrieve it.
+    HOME_TEAM.NAME : The name of the home team. You MUST ask the user to provide a name if you don't have one.
+    HOME_TEAM.STARS : The stars of the home team. You MUST ask the user to provide a number between 0.5 and 5, increasing by 0.5 increments.
+    The same goes for the away team.
+    `,
     schema: z.object({
-      matchId: z.string().min(1),
-      homeTeam: z.object({
-        player: z.string().min(1),
-        name: z.string().min(1),
-        stars: z.number().min(0.5).max(5).step(0.5),
+      MATCH_UUID: z.string().uuid(),
+      HOME_TEAM: z.object({
+        PLAYER_UUID: z.string().uuid(),
+        NAME: z.string().min(1),
+        STARS: z.number().min(0.5).max(5).step(0.5),
       }),
-      awayTeam: z.object({
-        player: z.string().min(1),
-        name: z.string().min(1),
-        stars: z.number().min(0.5).max(5).step(0.5),
+      AWAY_TEAM: z.object({
+        PLAYER_UUID: z.string().uuid(),
+        NAME: z.string().min(1),
+        STARS: z.number().min(0.5).max(5).step(0.5),
       }),
     }),
     async func(input) {
       try {
-        await startMatch.execute({
-          matchId: input.matchId,
+        const startedMatch = await startMatch.execute({
+          matchId: input.MATCH_UUID,
           homeTeam: {
-            player: input.homeTeam.player,
-            name: input.homeTeam.name,
-            stars: input.homeTeam.stars,
+            player: input.HOME_TEAM.PLAYER_UUID,
+            name: input.HOME_TEAM.NAME,
+            stars: input.HOME_TEAM.STARS,
           },
           awayTeam: {
-            player: input.awayTeam.player,
-            name: input.awayTeam.name,
-            stars: input.awayTeam.stars,
+            player: input.AWAY_TEAM.PLAYER_UUID,
+            name: input.AWAY_TEAM.NAME,
+            stars: input.AWAY_TEAM.STARS,
           },
         });
-        const result = `Le match a démarré avec succès et l'uuid du match en cours est ${input.matchId}`;
-        await memory.saveContext(
-          {
-            input: `Le match en cours a pour id ${input.matchId} et oppose ${input.homeTeam.name} joué par le joueur avec l'id ${input.homeTeam.player} à ${input.awayTeam.name} joué par le joueur avec l'id ${input.awayTeam.player}}`,
-          },
-          {
-            output:
-              "Ok, j'utiliserai ces informations pour les prochaines actions dès que j'aurai besoin d'utiliser l'id du match en cours, ou l'id de l'un des joueurs du match en cours",
-          },
-        );
+        const result = JSON.stringify({
+          currentMatch: formatMatchSnapshotToAi(startedMatch),
+        });
         return result;
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
 
 export const halfTimeTool = (halfTime: HalfTime) =>
   new DynamicStructuredTool({
-    name: 'siffler-la-mi-temps',
-    description: `Utilise cet outil pour indiquer que la mi-temps du match a été sifflée. L'input contient l'uuid du match en cours. Indique aux joueurs les actions qu'ils doivent faire en fonction de ce qui t'es retourné.`,
+    name: 'half-time',
+    description: `You MUST use this tool when the user notifies that it is the half time of the match. The input is :
+    CURRENT_MATCH_UUID. You MUST know this uuid, if not, you must check what is the current match or ask the user if they have started a match or not.`,
     schema: z.object({
-      matchId: z.string().min(1),
+      CURRENT_MATCH_UUID: z.string().uuid(),
     }),
     async func(input) {
       try {
         const playerActions = await halfTime.execute({
-          matchId: input.matchId,
+          matchId: input.CURRENT_MATCH_UUID,
         });
-        return `La mi-temps a été sifflée avec succès, voici les actions de joueurs : ${JSON.stringify(
+        return JSON.stringify({
           playerActions,
-        )}`;
+        });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
 
 export const endMatchTool = (endMatch: EndMatch) =>
   new DynamicStructuredTool({
-    name: 'terminer-le-match',
-    description: `Utilise cet outil pour indiquer que le match est terminé. L'input contient l'uuid du match en cours. Indique aux joueurs les actions qu'ils doivent faire en fonction de ce qui t'es retourné, de façon taquine et parfois moqueuse, mais toujours dans la bienveillance.`,
+    name: 'end-the-match',
+    description: `You MUST use this tool when the user notifies that the match is over. The input is :
+    CURRENT_MATCH_UUID. The id of the current match. You MUST know this uuid, if not, you must check what is the current match or ask the user if they have started a match or not.`,
     schema: z.object({
-      matchId: z.string().min(1),
+      CURRENT_MATCH_UUID: z.string().uuid(),
     }),
     async func(input) {
       try {
         const playerActions = await endMatch.execute({
-          matchId: input.matchId,
+          matchId: input.CURRENT_MATCH_UUID,
         });
-        return `Le match a été terminé avec succès, voici les actions de joueurs : ${JSON.stringify(
+        return JSON.stringify({
           playerActions,
-        )}`;
+        });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });
 
 export const scoreGoalTool = (scoreGoal: ScoreGoal) => {
   return new DynamicStructuredTool({
-    name: 'but-marque',
-    description: `Utilise cet outil pour indiquer qu'un but a été marqué. L'input contient l'uuid du match en cours, l'id du joueur qui a marqué le but et le type de but marqué. Indique aux joueurs les actions qu'ils doivent faire en fonction de ce qui t'es retourné de façon taquine et parfois moqueuse, mais toujours dans la bienveillance. Le type de but marqué peut être soit un but malade, c'est un but vraiment dingue, genre un tir hors de la surface de réparation en pleine lucarne, une reprise de volée, etc. Un but carotte est un but généré par un bug du jeu ou vraiment par un énorme coup de chance. Un but ketchup est un but de lâche, c'est un but marqué en voulant humilier l'adversaire, genre en faisant une roulette, en faisant une passe à son gardien, etc. Tous les autres buts sont de type "normal".`,
+    name: 'goal-scored',
+    description: `You MUST use this tool when a player indicates that a goal has been scored. The input is :
+    CURRENT_MATCH_UUID. The id of the current match. You MUST know this uuid, if not, you must check what is the current match or ask the user if they have started a match or not.
+    SCORED_BY_PLAYER_UUID. The id of the player who scored the goal. You MUST have already seen this PLAYER_UUID before ! If you don't know what PLAYER_UUID to use, ask the user more information about how to retrieve it.
+    GOAL_TYPE : A "malade" goal: This is a truly insane goal, like a shot from outside the box that goes straight into the top corner, a volley, etc.
+    A "carotte" goal: This goal is generated by a game bug or is really just a massive stroke of luck.
+    A "ketchup" goal: This is a cheeky goal, scored with the intention to humiliate the opponent, like doing a roulette move or passing the ball to their own goalkeeper, etc.
+    All other goals are of the "normal" type.`,
     schema: z.object({
-      matchId: z.string().min(1),
-      scoredByPlayerId: z.string().min(1),
-      goalType: z.nativeEnum(GoalType),
+      CURRENT_MATCH_UUID: z.string().uuid(),
+      SCORED_BY_PLAYER_UUID: z.string().uuid(),
+      GOAL_TYPE: z.nativeEnum(GoalType),
     }),
     async func(input) {
       try {
         const playerActions = await scoreGoal.execute({
-          matchId: input.matchId,
-          scoredBy: input.scoredByPlayerId,
-          goalType: input.goalType,
+          matchId: input.CURRENT_MATCH_UUID,
+          scoredBy: input.SCORED_BY_PLAYER_UUID,
+          goalType: input.GOAL_TYPE,
         });
-        return `Le but a été marqué avec succès, voici les actions de joueurs : ${JSON.stringify(
+        return JSON.stringify({
           playerActions,
-        )}`;
+        });
       } catch (err) {
-        return `Le système a rencontré une erreur: ${err.message}. Essaye de la gérer par toi-même`;
+        console.error(err);
+        return `The system encounters an error: ${err.message}. Try to figure it out by yourself how to remedy to it by using other tools or asking the user for missing information`;
       }
     },
   });

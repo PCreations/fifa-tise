@@ -1,63 +1,65 @@
 import { GoalType } from './match.entity';
 
 export abstract class PlayerAction {
-  playerName: string;
   shots: number;
-  description: string;
 
-  protected computeShots(ratingDiff: number) {
-    return Math.ceil(ratingDiff);
+  constructor(
+    protected readonly playerName: string,
+    protected readonly description: string,
+    readonly multiplier: number,
+    readonly ratingDiff: number,
+  ) {
+    this.shots = (1 + ratingDiff) * this.multiplier;
   }
 }
 
 export class ButMaladeAction extends PlayerAction {
-  static readonly MULTIPLIER = 2;
-  description = 'But incroyable, malade ! Tu dois boire le double de shots';
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * ButMaladeAction.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      'But incroyable, malade ! Tu dois boire le double de shots',
+      2,
+      ratingDiff,
+    );
   }
 }
 
 export class ButCarotteAction extends PlayerAction {
-  static readonly MULTIPLIER = 0.5;
-  description =
-    "But carotte, c'était que de la chance... Moitié moins de shots pour toi !";
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * ButCarotteAction.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      "But carotte, c'était que de la chance... Moitié moins de shots pour toi !",
+      0.5,
+      ratingDiff,
+    );
   }
 }
 
-export class ButKetchupMisAtion extends PlayerAction {
+export class ButKetchupMisAction extends PlayerAction {
   static readonly MULTIPLIER = 0.5;
   description =
     'But Ketchup mis, quel manque de respect...Le joueur ayant marqué doit boire la moitié des shots de son adversaire...';
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * ButKetchupMisAtion.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      'But Ketchup mis, quel manque de respect...Le joueur ayant marqué doit boire la moitié des shots de son adversaire...',
+      0.5,
+      ratingDiff,
+    );
   }
 }
 
-export class ButKetchupPrisAtion extends PlayerAction {
+export class ButKetchupPrisAction extends PlayerAction {
   static readonly MULTIPLIER = 1;
   description =
     'But Ketchup pris, quel manque de respect...Tu bois juste le nombre de shots normal, mais ton adversaire en boit la moitié aussi !';
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * ButKetchupPrisAtion.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      'But Ketchup pris, quel manque de respect...Tu bois juste le nombre de shots normal, mais ton adversaire en boit la moitié aussi !',
+      1,
+      ratingDiff,
+    );
   }
 }
 
@@ -65,24 +67,26 @@ export class ButNormalAction extends PlayerAction {
   static readonly MULTIPLIER = 1;
   description =
     'But normal pris, rien de spécial, chacun boit le nombre de shots normal';
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * ButKetchupPrisAtion.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      'But normal pris, rien de spécial, chacun boit le nombre de shots normal',
+      1,
+      ratingDiff,
+    );
   }
 }
 
 export class EndPeriodAction extends PlayerAction {
-  static readonly MULTIPLIER = 1;
+  readonly MULTIPLIER = 1;
   description = 'Egalité, chacun boit le nombre de shots normal';
-  constructor(
-    public playerName: string,
-    ratingDiff: number,
-  ) {
-    super();
-    this.shots = this.computeShots(ratingDiff * EndPeriodAction.MULTIPLIER);
+  constructor(playerName: string, ratingDiff: number) {
+    super(
+      playerName,
+      'Egalité, chacun boit le nombre de shots normal',
+      1,
+      ratingDiff,
+    );
   }
 }
 
@@ -91,25 +95,34 @@ export class PlayerActionFactory {
     scoredBy,
     against,
     goalType,
-    ratingDiff,
+    againstRatingDiff,
+    scoredByRatingDiff,
   }: {
     scoredBy: string;
     against: string;
     goalType: GoalType;
-    ratingDiff: number;
+    againstRatingDiff: number;
+    scoredByRatingDiff: number;
   }): PlayerAction[] {
+    console.log({
+      scoredBy,
+      against,
+      goalType,
+      againstRatingDiff,
+      scoredByRatingDiff,
+    });
     switch (goalType) {
       case GoalType.MALADE:
-        return [new ButMaladeAction(against, ratingDiff)];
+        return [new ButMaladeAction(against, againstRatingDiff)];
       case GoalType.CAROTTE:
-        return [new ButCarotteAction(against, ratingDiff)];
+        return [new ButCarotteAction(against, againstRatingDiff)];
       case GoalType.KETCHUP:
         return [
-          new ButKetchupMisAtion(against, ratingDiff),
-          new ButKetchupPrisAtion(scoredBy, ratingDiff),
+          new ButKetchupMisAction(scoredBy, againstRatingDiff),
+          new ButKetchupPrisAction(against, againstRatingDiff),
         ];
       case GoalType.NORMAL:
-        return [new ButNormalAction(against, ratingDiff)];
+        return [new ButNormalAction(against, againstRatingDiff)];
     }
   }
 }

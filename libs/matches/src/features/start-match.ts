@@ -55,6 +55,8 @@ export class StartMatch {
       away: startMatchCommand.awayTeam,
     });
 
-    return this.matchRepository.save(match);
+    await this.matchRepository.save(match);
+
+    return match.takeSnapshot();
   }
 }
